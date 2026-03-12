@@ -38,6 +38,9 @@ import {
   Bot,
   Wifi,
   Send,
+  Building2,
+  Globe,
+  HandCoins,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -218,6 +221,31 @@ const navGroups = computed<NavGroup[]>(() => {
           to: '/gift-cards',
           icon: Gift,
           permission: 'GET:/admin/gift-cards',
+        },
+      ],
+    },
+    {
+      id: 'subsites',
+      label: t('admin.navGroups.subsiteManagement'),
+      icon: Building2,
+      items: [
+        {
+          label: t('admin.navItems.subsiteSettings'),
+          to: '/subsites/settings',
+          icon: SlidersHorizontal,
+          permission: 'GET:/admin/subsites/settings',
+        },
+        {
+          label: t('admin.navItems.subsiteList'),
+          to: '/subsites',
+          icon: Globe,
+          permission: 'GET:/admin/subsites',
+        },
+        {
+          label: t('admin.navItems.subsiteWithdraws'),
+          to: '/subsites/withdraws',
+          icon: HandCoins,
+          permission: 'GET:/admin/subsites/withdraws',
         },
       ],
     },

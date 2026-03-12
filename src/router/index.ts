@@ -161,6 +161,24 @@ const routes = [
         meta: { permission: 'GET:/admin/authz/audit-logs' },
       },
       {
+        path: 'subsites/settings',
+        name: 'subsites-settings',
+        component: () => import('@/views/admin/SubsiteSettings.vue'),
+        meta: { permission: 'GET:/admin/subsites/settings' },
+      },
+      {
+        path: 'subsites',
+        name: 'subsites',
+        component: () => import('@/views/admin/Subsites.vue'),
+        meta: { permission: 'GET:/admin/subsites' },
+      },
+      {
+        path: 'subsites/withdraws',
+        name: 'subsites-withdraws',
+        component: () => import('@/views/admin/SubsiteWithdraws.vue'),
+        meta: { permission: 'GET:/admin/subsites/withdraws' },
+      },
+      {
         path: 'site-connections',
         name: 'site-connections',
         component: () => import('@/views/admin/SiteConnections.vue'),

@@ -28,6 +28,10 @@ import type {
   AdminAffiliateUser,
   AdminAffiliateCommission,
   AdminAffiliateWithdraw,
+  AdminSubsiteSettings,
+  AdminSubsiteSuffix,
+  AdminSubsite,
+  AdminSubsiteWithdraw,
   AdminTelegramBotRuntimeStatus,
   AdminTelegramBroadcast,
   AdminTelegramBroadcastUser,
@@ -224,6 +228,13 @@ export interface AdminExportGiftCardsPayload {
   format: 'txt' | 'csv'
 }
 
+
+export interface AdminCreateSubsiteSuffixPayload {
+  suffix: string
+  is_active?: boolean
+  sort_order?: number
+}
+
 export interface AdminAffiliateSetting {
   enabled: boolean
   commission_rate: number
@@ -294,6 +305,17 @@ export const adminAPI = {
   testNotificationCenterSettings: (data: Record<string, unknown>) => api.post<ApiResponse>('/admin/settings/notification-center/test', data),
   getAffiliateSettings: () => api.get<ApiResponse<AdminAffiliateSetting>>('/admin/settings/affiliate'),
   updateAffiliateSettings: (data: AdminAffiliateSetting) => api.put<ApiResponse<AdminAffiliateSetting>>('/admin/settings/affiliate', data),
+  getSubsiteSettings: () => api.get<ApiResponse<AdminSubsiteSettings>>('/admin/subsites/settings'),
+  updateSubsiteSettings: (data: AdminSubsiteSettings) => api.put<ApiResponse<AdminSubsiteSettings>>('/admin/subsites/settings', data),
+  getSubsiteSuffixes: (params?: Record<string, unknown>) => api.get<ApiResponse<AdminSubsiteSuffix[]>>('/admin/subsites/suffixes', { params }),
+  createSubsiteSuffix: (data: AdminCreateSubsiteSuffixPayload) => api.post<ApiResponse<AdminSubsiteSuffix>>('/admin/subsites/suffixes', data),
+  updateSubsiteSuffix: (id: number, data: Partial<AdminCreateSubsiteSuffixPayload>) => api.put<ApiResponse<AdminSubsiteSuffix>>(`/admin/subsites/suffixes/${id}`, data),
+  deleteSubsiteSuffix: (id: number) => api.delete<ApiResponse>(`/admin/subsites/suffixes/${id}`),
+  getSubsites: (params?: Record<string, unknown>) => api.get<ApiResponse<AdminSubsite[]>>('/admin/subsites', { params }),
+  updateSubsiteStatus: (id: number, data: { status: string }) => api.put<ApiResponse>(`/admin/subsites/${id}/status`, data),
+  getSubsiteWithdraws: (params?: Record<string, unknown>) => api.get<ApiResponse<AdminSubsiteWithdraw[]>>('/admin/subsites/withdraws', { params }),
+  rejectSubsiteWithdraw: (id: number, data: { reason?: string }) => api.post<ApiResponse>(`/admin/subsites/withdraws/${id}/reject`, data),
+  paySubsiteWithdraw: (id: number) => api.post<ApiResponse>(`/admin/subsites/withdraws/${id}/pay`, {}),
   getPublicConfig: () => api.get<ApiResponse<Record<string, unknown>>>('/public/config'),
   getImageCaptcha: () => api.get<ApiResponse<{ captcha_id: string; captcha_image: string }>>('/public/captcha/image'),
   getDashboardOverview: (params?: Record<string, unknown>) => api.get<ApiResponse<AdminDashboardOverview>>('/admin/dashboard/overview', { params }),
