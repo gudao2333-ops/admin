@@ -190,6 +190,15 @@ export interface AdminExportCardSecretsPayload {
   format: 'txt' | 'csv'
 }
 
+export interface AdminCreateCardSecretBatchPayload {
+  product_id: number
+  sku_id: number
+  name?: string
+  secrets: string[]
+  batch_no?: string
+  note?: string
+}
+
 export type AdminGiftCardStatus = 'active' | 'redeemed' | 'disabled'
 
 export interface AdminGenerateGiftCardsPayload {
@@ -344,7 +353,7 @@ export const adminAPI = {
   getPromotions: (params?: Record<string, unknown>) => api.get<ApiResponse<AdminPromotion[]>>('/admin/promotions', { params }),
   updatePromotion: (id: number, data: Partial<AdminPromotion>) => api.put<ApiResponse<AdminPromotion>>(`/admin/promotions/${id}`, data),
   deletePromotion: (id: number) => api.delete<ApiResponse>(`/admin/promotions/${id}`),
-  createCardSecretBatch: (data: { product_id: number; sku_id?: number; name?: string; secrets: string[]; batch_no?: string; note?: string }) => api.post<ApiResponse<AdminCardSecretBatch>>('/admin/card-secrets/batch', data),
+  createCardSecretBatch: (data: AdminCreateCardSecretBatchPayload) => api.post<ApiResponse<AdminCardSecretBatch>>('/admin/card-secrets/batch', data),
   importCardSecretCSV: (formData: FormData) =>
     api.post<ApiResponse>('/admin/card-secrets/import', formData, {
       headers: {

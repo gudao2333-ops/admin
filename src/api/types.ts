@@ -162,9 +162,16 @@ export interface AdminCardSecret {
   product_id: number
   sku_id: number
   batch_id?: number
+  batch_no?: string
   secret: string
   status: string
   order_id?: number
+  order_no?: string
+  redeemed_user_id?: number
+  redeemed_user_name?: string
+  redeemed_user_email?: string
+  expires_at?: string
+  redeemed_at?: string
   reserved_at?: string
   used_at?: string
   created_at: string
