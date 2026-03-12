@@ -450,7 +450,10 @@ onMounted(() => {
 <template>
   <div class="space-y-6">
     <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold">{{ t('admin.giftCards.title') }}</h1>
+      <div>
+        <h1 class="text-2xl font-semibold">{{ t('admin.giftCards.title') }}</h1>
+        <p class="text-xs text-muted-foreground mt-1">{{ t('admin.giftCards.legacyHint') }}</p>
+      </div>
       <Button size="sm" class="gap-2" @click="openGenerateModal">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
