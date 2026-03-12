@@ -608,3 +608,56 @@ export interface AdminAffiliateWithdraw {
   user_email?: string
   affiliate_profile?: { id: number; user_id: number; code: string; user_email?: string; user_display_name?: string; user?: { id: number; email: string; display_name?: string } }
 }
+
+// --- Subsite ---
+export interface AdminSubsiteSettings {
+  enabled: boolean
+  opening_price: number
+  profit_confirm_days: number
+  min_withdraw_amount: number
+  withdraw_channels: string[]
+  reserved_prefixes: string[]
+}
+
+export interface AdminSubsiteSuffix {
+  id: number
+  suffix: string
+  is_active: boolean
+  sort_order: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface AdminSubsite {
+  id: number
+  user_id: number
+  site_name: string
+  domain: string
+  suffix: string
+  status: string
+  opening_price: number
+  total_profit: number
+  withdrawable_profit: number
+  created_at: string
+  updated_at: string
+  user?: {
+    id: number
+    email?: string
+    display_name?: string
+  }
+}
+
+export interface AdminSubsiteWithdraw {
+  id: number
+  site_id: number
+  amount: number
+  channel: string
+  account?: string
+  status: string
+  reject_reason?: string
+  created_at: string
+  processed_at?: string
+  paid_at?: string
+  site?: AdminSubsite
+  processor?: { username?: string } | string
+}
