@@ -35,6 +35,7 @@ const filters = reactive({
   createdTo: '',
   status: '',
   userId: '',
+  userKeyword: '',
 })
 const statusEdits = reactive<Record<number, string>>({})
 const showDetail = ref(false)
@@ -62,6 +63,7 @@ const fetchOrders = async (page = 1) => {
       page_size: pagination.value.page_size,
       status: normalizeFilterValue(filters.status) || undefined,
       user_id: filters.userId || undefined,
+      user_keyword: filters.userKeyword || undefined,
       order_no: filters.orderNo || undefined,
       guest_email: filters.guestEmail || undefined,
       created_from: toRFC3339(filters.createdFrom),
@@ -228,6 +230,9 @@ watch(
       <div class="flex flex-wrap items-center gap-3">
         <div class="w-full md:w-32">
           <Input v-model="filters.userId" :placeholder="t('admin.orders.filterUserId')" @update:modelValue="debouncedSearch" />
+        </div>
+        <div class="w-full md:w-56">
+          <Input v-model="filters.userKeyword" :placeholder="t('admin.orders.filterUserKeyword')" @update:modelValue="debouncedSearch" />
         </div>
         <div class="w-full md:w-48">
           <Input v-model="filters.orderNo" :placeholder="t('admin.orders.filterOrderNo')" @update:modelValue="debouncedSearch" />

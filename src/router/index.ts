@@ -48,6 +48,18 @@ const routes = [
         meta: { permission: 'GET:/admin/gift-cards' },
       },
       {
+        path: 'redeem-code-batches',
+        name: 'redeem-code-batches',
+        component: () => import('@/views/admin/RedeemCodeBatches.vue'),
+        meta: { permission: 'GET:/admin/redeem-code-batches' },
+      },
+      {
+        path: 'redeem-codes',
+        name: 'redeem-codes',
+        component: () => import('@/views/admin/RedeemCodes.vue'),
+        meta: { permission: 'GET:/admin/redeem-codes' },
+      },
+      {
         path: 'orders',
         name: 'orders',
         component: () => import('@/views/admin/Orders.vue'),
@@ -161,24 +173,6 @@ const routes = [
         meta: { permission: 'GET:/admin/authz/audit-logs' },
       },
       {
-        path: 'subsites/settings',
-        name: 'subsites-settings',
-        component: () => import('@/views/admin/SubsiteSettings.vue'),
-        meta: { permission: 'GET:/admin/subsites/settings' },
-      },
-      {
-        path: 'subsites',
-        name: 'subsites',
-        component: () => import('@/views/admin/Subsites.vue'),
-        meta: { permission: 'GET:/admin/subsites' },
-      },
-      {
-        path: 'subsites/withdraws',
-        name: 'subsites-withdraws',
-        component: () => import('@/views/admin/SubsiteWithdraws.vue'),
-        meta: { permission: 'GET:/admin/subsites/withdraws' },
-      },
-      {
         path: 'site-connections',
         name: 'site-connections',
         component: () => import('@/views/admin/SiteConnections.vue'),
@@ -218,6 +212,18 @@ const routes = [
         path: 'telegram-bot/settings',
         name: 'telegram-bot-settings',
         component: () => import('@/views/admin/TelegramBotSettings.vue'),
+        meta: { permission: 'GET:/admin/settings/telegram-bot' },
+      },
+      {
+        path: 'telegram-bot/help-center',
+        name: 'telegram-bot-help-center',
+        component: () => import('@/views/admin/TelegramBotHelpCenter.vue'),
+        meta: { permission: 'GET:/admin/settings/telegram-bot' },
+      },
+      {
+        path: 'telegram-bot/menu',
+        name: 'telegram-bot-menu-settings',
+        component: () => import('@/views/admin/TelegramBotMenuSettings.vue'),
         meta: { permission: 'GET:/admin/settings/telegram-bot' },
       },
       {

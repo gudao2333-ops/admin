@@ -70,19 +70,42 @@ const createEmptyLocaleText = () => ({
   'en-US': '',
 })
 
+const extractLocalizedSpecValues = (specValues: unknown) => {
+  const normalized = createEmptyLocaleText()
+  if (!specValues || typeof specValues !== 'object' || Array.isArray(specValues)) {
+    return normalized
+  }
+
+  const row = specValues as Record<string, unknown>
+  const directLocaleKeys = ['zh-CN', 'zh-TW', 'en-US'] as const
+  directLocaleKeys.forEach((key) => {
+    const text = String(row[key] ?? '').trim()
+    if (text) {
+      normalized[key] = text
+    }
+  })
+
+  const legacyName = row.name
+  if (legacyName && typeof legacyName === 'object' && !Array.isArray(legacyName)) {
+    const legacy = legacyName as Record<string, unknown>
+    directLocaleKeys.forEach((key) => {
+      if (normalized[key]) return
+      const text = String(legacy[key] ?? '').trim()
+      if (text) {
+        normalized[key] = text
+      }
+    })
+  } else if (typeof legacyName === 'string' && legacyName.trim() && !normalized['zh-CN']) {
+    normalized['zh-CN'] = legacyName.trim()
+  }
+
+  return normalized
+}
+
 const createSKUFormItem = (raw?: Partial<AdminProductSKU>): SKUFormItem => ({
   id: Number(raw?.id || 0),
   sku_code: String(raw?.sku_code || '').trim(),
-  spec_values: {
-    ...createEmptyLocaleText(),
-    ...Object.keys(raw?.spec_values || {}).reduce((result: Record<string, string>, key) => {
-      const text = String(raw?.spec_values?.[key] ?? '').trim()
-      if (text) {
-        result[key] = text
-      }
-      return result
-    }, {}),
-  },
+  spec_values: extractLocalizedSpecValues(raw?.spec_values),
   price_amount: Number(raw?.price_amount || 0),
   manual_stock_total: toSafeStockTotal(raw?.manual_stock_total),
   is_active: raw?.is_active ?? true,
@@ -96,6 +119,7 @@ const form = reactive({
   seo_meta: { keywords: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' }, description: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' } } as { keywords: LocalizedText; description: LocalizedText; [key: string]: LocalizedText },
   description: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' } as LocalizedText,
   content: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' } as LocalizedText,
+  manual_delivery_text: '',
   price_amount: 0,
   images: [] as string[],
   tags: [] as string[],
@@ -211,11 +235,12 @@ const normalizeLocaleText = (value: unknown) => {
 
 const normalizeSpecValues = (value: unknown) => {
   const result: Record<string, string> = {}
-  if (!value || typeof value !== 'object') {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return result
   }
+
   const obj = value as Record<string, unknown>
-  Object.keys(obj).forEach((key) => {
+  ;(['zh-CN', 'zh-TW', 'en-US'] as const).forEach((key) => {
     const text = String(obj[key] ?? '').trim()
     if (text) {
       result[key] = text
@@ -392,6 +417,7 @@ const resetForm = () => {
     seo_meta: { keywords: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' }, description: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' } },
     description: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' },
     content: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' },
+    manual_delivery_text: '',
     price_amount: 0,
     images: [],
     tags: [],
@@ -434,6 +460,7 @@ const populateForm = (product: AdminProduct) => {
     seo_meta: normalizeSeoMeta(product.seo_meta),
     description: product.description || { 'zh-CN': '', 'zh-TW': '', 'en-US': '' },
     content: product.content || { 'zh-CN': '', 'zh-TW': '', 'en-US': '' },
+    manual_delivery_text: String(product.manual_delivery_text || ''),
     price_amount: Number(product.price_amount || 0),
     images: imagesList,
     tags: tagsList,
@@ -482,6 +509,7 @@ const handleSubmit = async () => {
       title: form.title,
       description: form.description,
       content: form.content,
+      manual_delivery_text: String(form.manual_delivery_text || '').trim(),
       price_amount: effectivePrice,
       images: form.images,
       tags: form.tags,
@@ -726,6 +754,16 @@ watch(
               {{ t('admin.products.form.manualStockTotalSkuTip') }}
             </p>
             <p v-else class="mt-1 text-xs text-muted-foreground">{{ t('admin.products.form.manualStockTotalTip') }}</p>
+          </div>
+
+          <div v-if="form.fulfillment_type === 'manual'" class="col-span-2">
+            <label class="block text-xs font-medium text-muted-foreground mb-1.5">固定发货文案</label>
+            <Textarea
+              v-model="form.manual_delivery_text"
+              rows="4"
+              placeholder="支付成功后自动发给用户的固定文案（可选）"
+            />
+            <p class="mt-1 text-xs text-muted-foreground">仅人工交付生效。填写后，用户支付成功将自动收到该文案并完成交付。</p>
           </div>
 
           <div v-if="form.fulfillment_type === 'manual' || editingIsMapped" class="col-span-2 rounded-xl border border-border bg-muted/20 p-4 space-y-4">

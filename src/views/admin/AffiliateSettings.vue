@@ -142,7 +142,7 @@ onMounted(fetchSettings)
 
         <div class="flex justify-end pt-2">
           <Button @click="saveSettings" :disabled="loading">
-            {{ t('admin.settings.save') }}
+            {{ t('admin.settings.actions.save') }}
           </Button>
         </div>
       </div>

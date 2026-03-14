@@ -49,6 +49,7 @@ export interface AdminProduct {
   title: LocalizedText
   description: LocalizedText
   content: LocalizedText
+  manual_delivery_text?: string
   price_amount: number
   images: string[]
   tags: string[]
@@ -142,6 +143,16 @@ export interface AdminOrder {
   user_email?: string
 }
 
+export interface AdminUserOAuthIdentity {
+  id: number
+  provider: string
+  provider_user_id: string
+  username?: string
+  avatar_url?: string
+  auth_at?: string
+  created_at: string
+}
+
 // --- CardSecret ---
 export interface AdminCardSecretBatch {
   id: number
@@ -162,16 +173,9 @@ export interface AdminCardSecret {
   product_id: number
   sku_id: number
   batch_id?: number
-  batch_no?: string
   secret: string
   status: string
   order_id?: number
-  order_no?: string
-  redeemed_user_id?: number
-  redeemed_user_name?: string
-  redeemed_user_email?: string
-  expires_at?: string
-  redeemed_at?: string
   reserved_at?: string
   used_at?: string
   created_at: string
@@ -224,6 +228,47 @@ export interface AdminGiftCardBatch {
   amount: number
   currency: string
   created_at: string
+}
+
+// --- RedeemCode ---
+export interface AdminRedeemCodeBatch {
+  id: number
+  name: string
+  product_id: number
+  sku_id: number
+  quantity: number
+  generated_count: number
+  expires_at?: string
+  remark?: string
+  created_at: string
+  updated_at: string
+  product?: AdminProduct
+  sku?: AdminProductSKU
+}
+
+export interface AdminRedeemCode {
+  id: number
+  code: string
+  batch_id: number
+  status: 'unused' | 'used' | 'frozen'
+  freeze_reason?: 'redeem_process' | 'admin'
+  used_at?: string
+  used_by_user_id?: number
+  used_order_id?: number
+  created_at: string
+  updated_at: string
+  batch?: AdminRedeemCodeBatch
+  is_expired?: boolean
+  used_user?: {
+    id: number
+    email?: string
+    display_name?: string
+  }
+  used_order?: {
+    id: number
+    order_no?: string
+    status?: string
+  }
 }
 
 // --- Promotion ---
@@ -326,6 +371,7 @@ export interface AdminPaymentChannel {
   channel_type: string
   interaction_mode: string
   fee_rate: number | string
+  fixed_fee?: number | string
   config_json: Record<string, unknown>
   is_active: boolean
   sort_order: number
@@ -344,7 +390,8 @@ export interface AdminPayment {
   interaction_mode: string
   amount: number
   payable_amount: number
-  fee_rate: number
+  fee_rate: number | string
+  fixed_fee?: number | string
   fee_amount: number
   currency: string
   status: string
@@ -377,6 +424,7 @@ export interface AdminUser {
   last_login_at?: string
   created_at: string
   updated_at: string
+  oauth_identities?: AdminUserOAuthIdentity[]
   [key: string]: unknown
 }
 
@@ -607,57 +655,4 @@ export interface AdminAffiliateWithdraw {
   affiliate_code?: string
   user_email?: string
   affiliate_profile?: { id: number; user_id: number; code: string; user_email?: string; user_display_name?: string; user?: { id: number; email: string; display_name?: string } }
-}
-
-// --- Subsite ---
-export interface AdminSubsiteSettings {
-  enabled: boolean
-  opening_price: number
-  profit_confirm_days: number
-  min_withdraw_amount: number
-  withdraw_channels: string[]
-  reserved_prefixes: string[]
-}
-
-export interface AdminSubsiteSuffix {
-  id: number
-  suffix: string
-  is_active: boolean
-  sort_order: number
-  created_at?: string
-  updated_at?: string
-}
-
-export interface AdminSubsite {
-  id: number
-  user_id: number
-  site_name: string
-  domain: string
-  suffix: string
-  status: string
-  opening_price: number
-  total_profit: number
-  withdrawable_profit: number
-  created_at: string
-  updated_at: string
-  user?: {
-    id: number
-    email?: string
-    display_name?: string
-  }
-}
-
-export interface AdminSubsiteWithdraw {
-  id: number
-  site_id: number
-  amount: number
-  channel: string
-  account?: string
-  status: string
-  reject_reason?: string
-  created_at: string
-  processed_at?: string
-  paid_at?: string
-  site?: AdminSubsite
-  processor?: { username?: string } | string
 }

@@ -1,5 +1,6 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import { Button } from '@/components/ui/button'
@@ -98,14 +99,28 @@ interface DashboardRankings {
 }
 
 const { t } = useI18n()
+const router = useRouter()
 
 const loadingOverview = ref(false)
 const loadingTrends = ref(false)
 const loadingRankings = ref(false)
+const loadingSKUStocks = ref(false)
 const dashboardError = ref('')
+const skuStockError = ref('')
 const overview = ref<DashboardOverview | null>(null)
 const trends = ref<DashboardTrends | null>(null)
 const rankings = ref<DashboardRankings | null>(null)
+const skuKeyword = ref('')
+const skuStocks = ref<Array<{
+  product_id: number
+  product_title: string
+  sku_id: number
+  sku_name: string
+  sku_code: string
+  fulfillment_type: string
+  stock: number
+  is_unlimited: boolean
+}>>([])
 
 const filters = reactive({
   range: '7d',
@@ -123,6 +138,35 @@ const rangeOptions = computed(() => [
 const isCustomRange = computed(() => filters.range === 'custom')
 
 const trendPoints = computed(() => trends.value?.points || [])
+const filteredSkuStocks = computed(() => {
+  const keyword = skuKeyword.value.trim().toLowerCase()
+  if (!keyword) return skuStocks.value
+  return skuStocks.value.filter((item) =>
+    `${item.product_title} ${item.sku_name} ${item.sku_code}`.toLowerCase().includes(keyword),
+  )
+})
+const skuStockSummary = computed(() => {
+  let red = 0
+  let orange = 0
+  let normal = 0
+  let unlimited = 0
+  filteredSkuStocks.value.forEach((item) => {
+    if (item.is_unlimited) {
+      unlimited += 1
+      return
+    }
+    if (item.stock <= 20) {
+      red += 1
+      return
+    }
+    if (item.stock <= 100) {
+      orange += 1
+      return
+    }
+    normal += 1
+  })
+  return { red, orange, normal, unlimited, total: filteredSkuStocks.value.length }
+})
 
 const maxOrderTrend = computed(() => {
   let maxValue = 1
@@ -252,8 +296,9 @@ const loadRankings = async (forceRefresh = false) => {
 
 const loadDashboard = async (forceRefresh = false) => {
   dashboardError.value = ''
+  skuStockError.value = ''
   try {
-    await Promise.all([loadOverview(forceRefresh), loadTrends(forceRefresh), loadRankings(forceRefresh)])
+    await Promise.all([loadOverview(forceRefresh), loadTrends(forceRefresh), loadRankings(forceRefresh), loadSKUStocks()])
   } catch (error: any) {
     dashboardError.value = error?.message || t('admin.dashboard.errors.fetchFailed')
   }
@@ -284,6 +329,126 @@ const handleCustomRangeChange = () => {
 
 const refreshDashboard = () => {
   loadDashboard(true)
+}
+
+const resolveLocalizedText = (value: unknown): string => {
+  if (!value) return ''
+  if (typeof value === 'string') return value.trim()
+  if (typeof value !== 'object') return String(value).trim()
+  const map = value as Record<string, unknown>
+  const localeOrder = ['zh-CN', 'zh-TW', 'en-US', 'en']
+  for (const key of localeOrder) {
+    const text = String(map[key] ?? '').trim()
+    if (text) return text
+  }
+  for (const text of Object.values(map)) {
+    const raw = String(text ?? '').trim()
+    if (raw) return raw
+  }
+  return ''
+}
+
+const resolveSkuName = (sku: any) => {
+  const specValues = sku?.spec_values
+  if (specValues && typeof specValues === 'object') {
+    const nameField = (specValues as Record<string, unknown>).name
+    const fromNameField = resolveLocalizedText(nameField)
+    if (fromNameField) return fromNameField
+    const fromSpec = resolveLocalizedText(specValues)
+    if (fromSpec) return fromSpec
+  }
+  const fallbackCode = String(sku?.sku_code || '').trim()
+  return fallbackCode || `SKU-${sku?.id ?? '-'}`
+}
+
+const resolveSkuStock = (product: any, sku: any) => {
+  const fulfillmentType = String(product?.fulfillment_type || '').toLowerCase()
+  if (fulfillmentType === 'auto') {
+    return Number(sku?.auto_stock_available ?? 0)
+  }
+  const manual = Number(sku?.manual_stock_total ?? 0)
+  if (manual < 0) return -1
+  return manual
+}
+
+const skuStockToneClass = (item: { stock: number; is_unlimited: boolean }) => {
+  if (item.is_unlimited) return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+  if (item.stock <= 20) return 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300'
+  if (item.stock <= 100) return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+  return 'border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300'
+}
+
+const canJumpToRestock = (item: { fulfillment_type: string; stock: number; is_unlimited: boolean }) => {
+  return item.fulfillment_type === 'auto' && !item.is_unlimited && item.stock <= 0
+}
+
+const jumpToRestock = (item: { product_id: number; sku_id: number; fulfillment_type: string; stock: number; is_unlimited: boolean }) => {
+  if (!canJumpToRestock(item)) return
+  router.push({
+    path: '/card-secrets',
+    query: {
+      product_id: String(item.product_id),
+      sku_id: String(item.sku_id),
+      status: 'available',
+    },
+  })
+}
+
+const loadSKUStocks = async () => {
+  loadingSKUStocks.value = true
+  try {
+    const allRows: Array<{
+      product_id: number
+      product_title: string
+      sku_id: number
+      sku_name: string
+      sku_code: string
+      fulfillment_type: string
+      stock: number
+      is_unlimited: boolean
+    }> = []
+    let page = 1
+    const pageSize = 100
+    const maxPages = 50
+    for (; page <= maxPages; page += 1) {
+      const response = await adminAPI.getProducts({ page, page_size: pageSize })
+      const products = Array.isArray(response?.data?.data) ? response.data.data : []
+      products.forEach((product: any) => {
+        const productTitle = resolveLocalizedText(product?.title) || `#${product?.id ?? '-'}`
+        const skus = Array.isArray(product?.skus) ? product.skus : []
+        skus
+          .filter((sku: any) => sku?.is_active !== false)
+          .forEach((sku: any) => {
+            const stockValue = resolveSkuStock(product, sku)
+            allRows.push({
+              product_id: Number(product?.id ?? 0),
+              product_title: productTitle,
+              sku_id: Number(sku?.id ?? 0),
+              sku_name: resolveSkuName(sku),
+              sku_code: String(sku?.sku_code || ''),
+              fulfillment_type: String(product?.fulfillment_type || '').toLowerCase(),
+              stock: stockValue < 0 ? 0 : stockValue,
+              is_unlimited: stockValue < 0,
+            })
+          })
+      })
+      const pagination = response?.data?.pagination
+      const totalPages = Number(pagination?.total_page ?? 1)
+      if (!products.length || page >= totalPages) break
+    }
+    skuStocks.value = allRows.sort((a, b) => {
+      if (a.is_unlimited && !b.is_unlimited) return 1
+      if (!a.is_unlimited && b.is_unlimited) return -1
+      if (a.stock !== b.stock) return a.stock - b.stock
+      if (a.product_title !== b.product_title) return a.product_title.localeCompare(b.product_title)
+      return a.sku_name.localeCompare(b.sku_name)
+    })
+  } catch (error: any) {
+    skuStockError.value = error?.message || 'SKU搴撳瓨鍔犺浇澶辫触'
+    skuStocks.value = []
+  } finally {
+    loadingSKUStocks.value = false
+  }
 }
 
 const alertClass = (level: string) => {
@@ -317,8 +482,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-start justify-between gap-3">
+  <div class="space-y-6 pb-4">
+    <div class="rounded-2xl border border-border/70 bg-gradient-to-r from-primary/5 via-background to-emerald-500/10 p-4 shadow-sm md:p-5">
+      <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 class="text-2xl font-semibold tracking-tight">{{ t('admin.dashboard.title') }}</h1>
         <p class="mt-1 text-sm text-muted-foreground">{{ t('admin.dashboard.subtitle') }}</p>
@@ -326,7 +492,7 @@ onMounted(() => {
       <div class="flex flex-wrap items-center gap-2">
         <div class="w-[150px]">
           <Select v-model="filters.range" @update:modelValue="handleRangeChange">
-            <SelectTrigger class="h-9">
+            <SelectTrigger class="h-9 bg-background/80">
               <SelectValue :placeholder="t('admin.dashboard.filters.range')" />
             </SelectTrigger>
             <SelectContent>
@@ -340,7 +506,7 @@ onMounted(() => {
           v-if="isCustomRange"
           v-model="filters.from"
           type="date"
-          class="h-9 w-[150px]"
+          class="h-9 w-[150px] bg-background/80"
           :placeholder="t('admin.dashboard.filters.from')"
           @update:modelValue="handleCustomRangeChange"
         />
@@ -348,22 +514,25 @@ onMounted(() => {
           v-if="isCustomRange"
           v-model="filters.to"
           type="date"
-          class="h-9 w-[150px]"
+          class="h-9 w-[150px] bg-background/80"
           :placeholder="t('admin.dashboard.filters.to')"
           @update:modelValue="handleCustomRangeChange"
         />
-        <Button size="sm" variant="outline" class="h-9" :disabled="loadingOverview || loadingTrends || loadingRankings" @click="refreshDashboard">
+        <Button size="sm" variant="outline" class="h-9 bg-background/80" :disabled="loadingOverview || loadingTrends || loadingRankings || loadingSKUStocks" @click="refreshDashboard">
           {{ t('admin.dashboard.actions.refreshNow') }}
         </Button>
       </div>
+    </div>
     </div>
 
     <div v-if="dashboardError" class="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
       {{ dashboardError }}
     </div>
 
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Card>
+    <div class="space-y-3">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Core KPIs</h2>
+      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-xs font-medium text-muted-foreground">{{ t('admin.dashboard.kpi.ordersTotal') }}</CardTitle>
         </CardHeader>
@@ -373,7 +542,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-xs font-medium text-muted-foreground">{{ t('admin.dashboard.kpi.gmvPaid') }}</CardTitle>
         </CardHeader>
@@ -383,7 +552,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-xs font-medium text-muted-foreground">{{ t('admin.dashboard.kpi.pendingOrders') }}</CardTitle>
         </CardHeader>
@@ -393,7 +562,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-xs font-medium text-muted-foreground">{{ t('admin.dashboard.kpi.newUsers') }}</CardTitle>
         </CardHeader>
@@ -403,7 +572,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-xs font-medium text-muted-foreground">{{ t('admin.dashboard.kpi.lowStockProducts') }}</CardTitle>
         </CardHeader>
@@ -413,7 +582,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-xs font-medium text-muted-foreground">{{ t('admin.dashboard.kpi.autoAvailableSecrets') }}</CardTitle>
         </CardHeader>
@@ -423,7 +592,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-xs font-medium text-muted-foreground">{{ t('admin.dashboard.kpi.paymentsSuccess') }}</CardTitle>
         </CardHeader>
@@ -433,7 +602,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-xs font-medium text-muted-foreground">{{ t('admin.dashboard.period') }}</CardTitle>
         </CardHeader>
@@ -442,10 +611,73 @@ onMounted(() => {
           <div class="mt-1 text-xs text-muted-foreground">{{ overview?.timezone || '-' }}</div>
         </CardContent>
       </Card>
+      </div>
     </div>
 
-    <div class="grid gap-4 xl:grid-cols-2">
-      <Card>
+    <Card class="border-border/70 bg-card/90 shadow-sm">
+      <CardHeader class="gap-3">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <CardTitle class="text-sm">SKU库存看板</CardTitle>
+          <div class="flex flex-wrap items-center gap-2 text-xs font-medium">
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-0.5 text-rose-700 dark:text-rose-300">
+              <span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>紧急 {{ skuStockSummary.red }}
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-amber-700 dark:text-amber-300">
+              <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>关注 {{ skuStockSummary.orange }}
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-emerald-700 dark:text-emerald-300">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>正常 {{ skuStockSummary.normal }}
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5 text-muted-foreground">
+              无限 {{ skuStockSummary.unlimited }}
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5 text-muted-foreground">
+              总数 {{ skuStockSummary.total }}
+            </span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <Input v-model="skuKeyword" class="h-9 max-w-md bg-background/80" placeholder="搜索商品名 / SKU名称 / SKU编码" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div v-if="loadingSKUStocks" class="text-sm text-muted-foreground">{{ t('admin.common.loading') }}</div>
+        <div v-else-if="skuStockError" class="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {{ skuStockError }}
+        </div>
+        <div v-else-if="filteredSkuStocks.length === 0" class="text-sm text-muted-foreground">暂无 SKU 库存数据</div>
+        <div v-else class="max-h-[520px] overflow-auto pr-1">
+          <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div
+            v-for="item in filteredSkuStocks"
+            :key="`${item.product_id}-${item.sku_id}`"
+            class="rounded-xl border px-3 py-3 transition-all hover:-translate-y-0.5"
+            :class="[skuStockToneClass(item), canJumpToRestock(item) ? 'cursor-pointer ring-1 ring-rose-400/30 hover:shadow-md' : '']"
+            @click="jumpToRestock(item)"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="min-w-0">
+                <div class="line-clamp-1 text-sm font-semibold">{{ item.product_title }}</div>
+                <div class="mt-0.5 line-clamp-1 text-xs opacity-90">{{ item.sku_name }} <span class="opacity-70">({{ item.sku_code || '-' }})</span></div>
+              </div>
+              <div class="shrink-0 text-right">
+                <div class="text-[11px] uppercase opacity-70">库存</div>
+                <div class="text-lg font-semibold">{{ item.is_unlimited ? '∞' : item.stock }}</div>
+              </div>
+            </div>
+            <div v-if="canJumpToRestock(item)" class="mt-2 inline-flex rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:text-rose-300">
+              已缺货 - 点击前往补卡
+            </div>
+          </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
+    <div class="space-y-3">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Trend Analysis</h2>
+      <div class="grid gap-4 xl:grid-cols-2">
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-sm">{{ t('admin.dashboard.trends.orderTitle') }}</CardTitle>
         </CardHeader>
@@ -472,7 +704,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-sm">{{ t('admin.dashboard.trends.paymentTitle') }}</CardTitle>
         </CardHeader>
@@ -498,10 +730,13 @@ onMounted(() => {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
 
-    <div class="grid gap-4 xl:grid-cols-3">
-      <Card>
+    <div class="space-y-3">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Operations</h2>
+      <div class="grid gap-4 xl:grid-cols-3">
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-sm">{{ t('admin.dashboard.funnel.title') }}</CardTitle>
         </CardHeader>
@@ -531,7 +766,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-sm">{{ t('admin.dashboard.rankings.topProductsTitle') }}</CardTitle>
         </CardHeader>
@@ -551,7 +786,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-sm">{{ t('admin.dashboard.rankings.topChannelsTitle') }}</CardTitle>
         </CardHeader>
@@ -576,7 +811,7 @@ onMounted(() => {
     </div>
 
     <div class="grid gap-4 xl:grid-cols-2">
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-sm">{{ t('admin.dashboard.alerts.title') }}</CardTitle>
         </CardHeader>
@@ -598,7 +833,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card class="border-border/70 bg-card/90 shadow-sm">
         <CardHeader class="pb-2">
           <CardTitle class="text-sm">{{ t('admin.dashboard.quickActions.title') }}</CardTitle>
         </CardHeader>
@@ -617,6 +852,9 @@ onMounted(() => {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
+
   </div>
 </template>
+

@@ -321,6 +321,18 @@ const formatScopeProducts = (products?: Array<{ title: Record<string, string> }>
   return `${names.slice(0, 3).join(', ')}...`
 }
 
+const oauthIdentities = computed(() => {
+  const list = user.value?.oauth_identities
+  return Array.isArray(list) ? list : []
+})
+
+const formatProviderLabel = (provider?: string) => {
+  if (!provider) return '-'
+  const normalized = provider.trim().toLowerCase()
+  if (normalized === 'telegram') return 'Telegram'
+  return normalized
+}
+
 onMounted(() => {
   fetchSiteCurrency()
   fetchUser()
@@ -421,6 +433,45 @@ watch(
         </CardContent>
       </Card>
     </div>
+
+    <Card class="rounded-lg border-border bg-background shadow-none">
+      <CardContent class="space-y-3 p-4">
+        <div>
+          <div class="text-xs text-muted-foreground">{{ t('admin.userDetail.oauth.title') }}</div>
+          <div class="text-sm text-muted-foreground">{{ t('admin.userDetail.oauth.subtitle') }}</div>
+        </div>
+        <div v-if="oauthIdentities.length === 0" class="text-sm text-muted-foreground">
+          {{ t('admin.userDetail.oauth.empty') }}
+        </div>
+        <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div
+            v-for="identity in oauthIdentities"
+            :key="identity.id"
+            class="rounded-lg border border-border bg-card px-4 py-3"
+          >
+            <div class="flex items-center gap-3">
+              <img
+                v-if="identity.avatar_url"
+                :src="identity.avatar_url"
+                :alt="identity.username || identity.provider_user_id"
+                class="h-10 w-10 rounded-full border border-border object-cover"
+              />
+              <div class="min-w-0">
+                <div class="text-sm font-medium text-foreground">{{ formatProviderLabel(identity.provider) }}</div>
+                <div class="truncate text-xs text-muted-foreground">
+                  {{ identity.username ? `@${identity.username}` : identity.provider_user_id }}
+                </div>
+              </div>
+            </div>
+            <div class="mt-3 space-y-1 text-xs text-muted-foreground">
+              <div>{{ t('admin.userDetail.oauth.providerUserId') }}: <span class="font-mono text-foreground">{{ identity.provider_user_id || '-' }}</span></div>
+              <div>{{ t('admin.userDetail.oauth.username') }}: <span class="text-foreground">{{ identity.username ? `@${identity.username}` : '-' }}</span></div>
+              <div>{{ t('admin.userDetail.oauth.boundAt') }}: <span class="text-foreground">{{ formatDate(identity.created_at) }}</span></div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
 
     <div class="flex w-fit gap-2 rounded-xl border border-border bg-card p-1">
       <button

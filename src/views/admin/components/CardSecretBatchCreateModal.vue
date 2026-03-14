@@ -56,10 +56,6 @@ const handleBatchCreate = async () => {
     batchError.value = t('admin.cardSecrets.errors.productRequired')
     return
   }
-  if (!props.skuId || props.skuId <= 0) {
-    batchError.value = t('admin.cardSecrets.errors.skuRequired')
-    return
-  }
   const secrets = batchForm.value.secrets
     .split(/\r?\n/)
     .map((item) => item.trim())
@@ -73,7 +69,7 @@ const handleBatchCreate = async () => {
   try {
     await adminAPI.createCardSecretBatch({
       product_id: props.productId,
-      sku_id: props.skuId,
+      sku_id: props.skuId || undefined,
       secrets,
       batch_no: batchForm.value.batch_no.trim(),
       note: batchForm.value.note.trim(),
@@ -119,10 +115,6 @@ const handleImport = async () => {
     importError.value = t('admin.cardSecrets.errors.productRequired')
     return
   }
-  if (!props.skuId || props.skuId <= 0) {
-    importError.value = t('admin.cardSecrets.errors.skuRequired')
-    return
-  }
   if (!importForm.value.file) {
     importError.value = t('admin.cardSecrets.errors.fileRequired')
     return
@@ -132,7 +124,9 @@ const handleImport = async () => {
   try {
     const formData = new FormData()
     formData.append('product_id', String(props.productId))
-    formData.append('sku_id', String(props.skuId))
+    if (props.skuId > 0) {
+      formData.append('sku_id', String(props.skuId))
+    }
     formData.append('batch_no', importForm.value.batch_no.trim())
     formData.append('note', importForm.value.note.trim())
     formData.append('file', importForm.value.file)
@@ -150,9 +144,6 @@ const handleImport = async () => {
 
 <template>
   <div v-if="modelValue" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="lg:col-span-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-muted-foreground">
-      {{ t('admin.cardSecrets.productModeHint') }}
-    </div>
     <!-- Manual batch create -->
     <div class="rounded-xl border border-border bg-card p-6">
       <h2 class="text-lg font-semibold text-foreground mb-4">{{ t('admin.cardSecrets.batchTitle') }}</h2>

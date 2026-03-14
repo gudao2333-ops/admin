@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDebounceFn } from '@vueuse/core'
 import { adminAPI } from '@/api/admin'
@@ -16,6 +17,7 @@ import CardSecretEditModal from './components/CardSecretEditModal.vue'
 import CardSecretBatchCreateModal from './components/CardSecretBatchCreateModal.vue'
 
 const { t } = useI18n()
+const route = useRoute()
 const adminPath = import.meta.env.VITE_ADMIN_PATH || ''
 
 const productKeyword = ref('')
@@ -59,6 +61,13 @@ const showEditModal = ref(false)
 const editingCardSecret = ref<AdminCardSecret | null>(null)
 
 const normalizeFilterValue = (value: string) => (value === '__all__' ? '' : value)
+
+const parseQueryNumber = (value: unknown) => {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed) || parsed <= 0) return null
+  return Math.floor(parsed)
+}
 
 const parseProductId = () => {
   if (selectedProductValue.value === '__all__') return null
@@ -115,8 +124,6 @@ const productHint = computed(() => {
   if (!currentProductId.value) return t('admin.cardSecrets.productHintEmpty')
   return t('admin.cardSecrets.productHintCurrent', { id: currentProductId.value })
 })
-
-const createReady = computed(() => Boolean(currentProductId.value && currentSkuId.value))
 
 const productInfoName = computed(() => {
   if (productInfo.value) return getLocalizedText(productInfo.value.title)
@@ -180,32 +187,6 @@ const resolveProductName = (productId: number) => {
 
 const productLink = (productId: number) => `${adminPath}/products?product_id=${productId}`
 const orderLink = (orderId: number) => `${adminPath}/orders?order_id=${orderId}`
-
-const secretExpiryText = (secret: AdminCardSecret) => {
-  if (!secret?.expires_at) return t('admin.cardSecrets.neverExpire')
-  return formatDate(secret.expires_at) || t('admin.cardSecrets.neverExpire')
-}
-
-const secretRedeemedUserText = (secret: AdminCardSecret) => {
-  const userId = Number(secret?.redeemed_user_id || 0)
-  const userName = String(secret?.redeemed_user_name || '').trim()
-  const userEmail = String(secret?.redeemed_user_email || '').trim()
-  if (userName && userEmail) return userId > 0 ? `#${userId} ${userName} (${userEmail})` : `${userName} (${userEmail})`
-  if (userName) return userId > 0 ? `#${userId} ${userName}` : userName
-  if (userEmail) return userId > 0 ? `#${userId} ${userEmail}` : userEmail
-  return userId > 0 ? `#${userId}` : '-'
-}
-
-const secretRedeemedTimeText = (secret: AdminCardSecret) => {
-  return formatDate(secret.redeemed_at || secret.used_at) || '-'
-}
-
-const secretBatchText = (secret: AdminCardSecret) => {
-  const batchNo = String(secret?.batch_no || secret?.batch?.batch_no || '').trim()
-  if (batchNo) return batchNo
-  if (secret.batch_id) return `#${secret.batch_id}`
-  return '-'
-}
 
 const clearBatchActionMessages = () => {
   batchActionError.value = ''
@@ -609,9 +590,31 @@ const secretSkuLabel = (secret: AdminCardSecret) => {
   return resolveSkuLabelById(Number(secret?.sku_id || 0))
 }
 
+const applyRouteFilters = () => {
+  const query = route.query || {}
+  const productID = parseQueryNumber(query.product_id)
+  const skuID = parseQueryNumber(query.sku_id)
+  const statusRaw = String(Array.isArray(query.status) ? query.status[0] : query.status || '').trim().toLowerCase()
+
+  if (productID) {
+    selectedProductValue.value = String(productID)
+  }
+  if (skuID) {
+    skuFilterValue.value = String(skuID)
+  }
+  if (statusRaw === 'available' || statusRaw === 'reserved' || statusRaw === 'used') {
+    cardSecretStatus.value = statusRaw
+  }
+}
+
 onMounted(async () => {
+  applyRouteFilters()
   await loadProductOptions()
-  await fetchCardSecrets(1)
+  if (parseProductId()) {
+    await refreshAll()
+  } else {
+    await fetchCardSecrets(1)
+  }
 })
 </script>
 
@@ -676,7 +679,6 @@ onMounted(async () => {
 
       <div class="mt-3 space-y-1 text-xs text-muted-foreground">
         <p>{{ productHint }}</p>
-        <p class="text-primary">{{ t('admin.cardSecrets.primaryModeHint') }}</p>
         <p v-if="productInfoName">
           {{ t('admin.cardSecrets.productNameLabel') }}：
           <a
@@ -699,13 +701,9 @@ onMounted(async () => {
     <CardSecretBatchCreateModal
       :model-value="!!currentProductId"
       :product-id="currentProductId || 0"
-      :sku-id="currentSkuId || 0"
+      :sku-id="currentSkuId"
       @success="handleBatchCreateSuccess"
     />
-
-    <p v-if="currentProductId && !createReady" class="text-xs text-amber-700">
-      {{ t('admin.cardSecrets.skuRequiredHint') }}
-    </p>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div class="rounded-xl border border-border bg-card p-6">
@@ -881,23 +879,20 @@ onMounted(async () => {
             <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.product') }}</TableHead>
             <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.sku') }}</TableHead>
             <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.status') }}</TableHead>
-            <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.batch') }}</TableHead>
-            <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.expiresAt') }}</TableHead>
-            <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.redeemedUser') }}</TableHead>
-            <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.redeemedOrder') }}</TableHead>
-            <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.redeemedTime') }}</TableHead>
+            <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.orderId') }}</TableHead>
+            <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.batchId') }}</TableHead>
             <TableHead class="px-4 py-3">{{ t('admin.cardSecrets.listTable.createdAt') }}</TableHead>
             <TableHead class="px-4 py-3 text-right">{{ t('admin.cardSecrets.listTable.action') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody class="divide-y divide-border">
           <TableRow v-if="cardSecretsLoading">
-            <TableCell :colspan="13" class="p-0">
-              <TableSkeleton :columns="13" :rows="5" />
+            <TableCell :colspan="10" class="p-0">
+              <TableSkeleton :columns="10" :rows="5" />
             </TableCell>
           </TableRow>
           <TableRow v-else-if="cardSecrets.length === 0">
-            <TableCell colspan="13" class="px-4 py-6 text-center text-muted-foreground">{{ t('admin.cardSecrets.emptyList') }}</TableCell>
+            <TableCell colspan="10" class="px-4 py-6 text-center text-muted-foreground">{{ t('admin.cardSecrets.emptyList') }}</TableCell>
           </TableRow>
           <TableRow v-for="secret in cardSecrets" :key="secret.id" class="hover:bg-muted/30">
             <TableCell class="px-4 py-3">
@@ -925,9 +920,6 @@ onMounted(async () => {
                 {{ cardSecretStatusLabel(secret.status) }}
               </span>
             </TableCell>
-            <TableCell class="px-4 py-3 text-xs text-muted-foreground">{{ secretBatchText(secret) }}</TableCell>
-            <TableCell class="px-4 py-3 text-xs text-muted-foreground">{{ secretExpiryText(secret) }}</TableCell>
-            <TableCell class="px-4 py-3 text-xs text-muted-foreground">{{ secretRedeemedUserText(secret) }}</TableCell>
             <TableCell class="px-4 py-3 text-xs">
               <div class="flex flex-col gap-1">
                 <a
@@ -945,7 +937,10 @@ onMounted(async () => {
                 </span>
               </div>
             </TableCell>
-            <TableCell class="px-4 py-3 text-xs text-muted-foreground">{{ secretRedeemedTimeText(secret) }}</TableCell>
+            <TableCell class="px-4 py-3 text-xs text-muted-foreground">
+              <span v-if="secret.batch_id">#{{ secret.batch_id }}</span>
+              <span v-else>-</span>
+            </TableCell>
             <TableCell class="px-4 py-3 text-xs text-muted-foreground">{{ formatDate(secret.created_at) }}</TableCell>
             <TableCell class="px-4 py-3 text-right">
               <Button size="sm" variant="outline" @click="openEditSecret(secret)">{{ t('admin.cardSecrets.actions.edit') }}</Button>

@@ -9,6 +9,8 @@ import type {
   AdminCoupon,
   AdminGiftCard,
   AdminGiftCardBatch,
+  AdminRedeemCode,
+  AdminRedeemCodeBatch,
   AdminPromotion,
   AdminBanner,
   AdminPost,
@@ -28,10 +30,6 @@ import type {
   AdminAffiliateUser,
   AdminAffiliateCommission,
   AdminAffiliateWithdraw,
-  AdminSubsiteSettings,
-  AdminSubsiteSuffix,
-  AdminSubsite,
-  AdminSubsiteWithdraw,
   AdminTelegramBotRuntimeStatus,
   AdminTelegramBroadcast,
   AdminTelegramBroadcastUser,
@@ -194,15 +192,6 @@ export interface AdminExportCardSecretsPayload {
   format: 'txt' | 'csv'
 }
 
-export interface AdminCreateCardSecretBatchPayload {
-  product_id: number
-  sku_id: number
-  name?: string
-  secrets: string[]
-  batch_no?: string
-  note?: string
-}
-
 export type AdminGiftCardStatus = 'active' | 'redeemed' | 'disabled'
 
 export interface AdminGenerateGiftCardsPayload {
@@ -228,11 +217,30 @@ export interface AdminExportGiftCardsPayload {
   format: 'txt' | 'csv'
 }
 
+export interface AdminCreateRedeemCodeBatchPayload {
+  name: string
+  product_id: number
+  sku_id: number
+  quantity: number
+  expires_at?: string
+  remark?: string
+}
 
-export interface AdminCreateSubsiteSuffixPayload {
-  suffix: string
-  is_active?: boolean
-  sort_order?: number
+export interface AdminGenerateRedeemCodesPayload {
+  count: number
+}
+
+export interface AdminUpdateRedeemCodeStatusPayload {
+  status: 'unused' | 'frozen'
+}
+
+export interface AdminExportRedeemCodesPayload {
+  code?: string
+  status?: string
+  batch_id?: number
+  product_id?: number
+  sku_id?: number
+  format?: 'txt' | 'csv'
 }
 
 export interface AdminAffiliateSetting {
@@ -305,17 +313,6 @@ export const adminAPI = {
   testNotificationCenterSettings: (data: Record<string, unknown>) => api.post<ApiResponse>('/admin/settings/notification-center/test', data),
   getAffiliateSettings: () => api.get<ApiResponse<AdminAffiliateSetting>>('/admin/settings/affiliate'),
   updateAffiliateSettings: (data: AdminAffiliateSetting) => api.put<ApiResponse<AdminAffiliateSetting>>('/admin/settings/affiliate', data),
-  getSubsiteSettings: () => api.get<ApiResponse<AdminSubsiteSettings>>('/admin/subsites/settings'),
-  updateSubsiteSettings: (data: AdminSubsiteSettings) => api.put<ApiResponse<AdminSubsiteSettings>>('/admin/subsites/settings', data),
-  getSubsiteSuffixes: (params?: Record<string, unknown>) => api.get<ApiResponse<AdminSubsiteSuffix[]>>('/admin/subsites/suffixes', { params }),
-  createSubsiteSuffix: (data: AdminCreateSubsiteSuffixPayload) => api.post<ApiResponse<AdminSubsiteSuffix>>('/admin/subsites/suffixes', data),
-  updateSubsiteSuffix: (id: number, data: Partial<AdminCreateSubsiteSuffixPayload>) => api.put<ApiResponse<AdminSubsiteSuffix>>(`/admin/subsites/suffixes/${id}`, data),
-  deleteSubsiteSuffix: (id: number) => api.delete<ApiResponse>(`/admin/subsites/suffixes/${id}`),
-  getSubsites: (params?: Record<string, unknown>) => api.get<ApiResponse<AdminSubsite[]>>('/admin/subsites', { params }),
-  updateSubsiteStatus: (id: number, data: { status: string }) => api.put<ApiResponse>(`/admin/subsites/${id}/status`, data),
-  getSubsiteWithdraws: (params?: Record<string, unknown>) => api.get<ApiResponse<AdminSubsiteWithdraw[]>>('/admin/subsites/withdraws', { params }),
-  rejectSubsiteWithdraw: (id: number, data: { reason?: string }) => api.post<ApiResponse>(`/admin/subsites/withdraws/${id}/reject`, data),
-  paySubsiteWithdraw: (id: number) => api.post<ApiResponse>(`/admin/subsites/withdraws/${id}/pay`, {}),
   getPublicConfig: () => api.get<ApiResponse<Record<string, unknown>>>('/public/config'),
   getImageCaptcha: () => api.get<ApiResponse<{ captcha_id: string; captcha_image: string }>>('/public/captcha/image'),
   getDashboardOverview: (params?: Record<string, unknown>) => api.get<ApiResponse<AdminDashboardOverview>>('/admin/dashboard/overview', { params }),
@@ -371,11 +368,23 @@ export const adminAPI = {
     api.patch<ApiResponse<{ affected: number }>>('/admin/gift-cards/batch-status', data),
   exportGiftCards: (data: AdminExportGiftCardsPayload) =>
     api.post('/admin/gift-cards/export', data, { responseType: 'blob' }),
+  getRedeemCodeBatches: (params?: Record<string, unknown>) =>
+    api.get<ApiResponse<AdminRedeemCodeBatch[]>>('/admin/redeem-code-batches', { params }),
+  createRedeemCodeBatch: (data: AdminCreateRedeemCodeBatchPayload) =>
+    api.post<ApiResponse<AdminRedeemCodeBatch>>('/admin/redeem-code-batches', data),
+  generateRedeemCodes: (batchID: number, data: AdminGenerateRedeemCodesPayload) =>
+    api.post<ApiResponse<{ generated: number; codes: AdminRedeemCode[] }>>(`/admin/redeem-code-batches/${batchID}/generate`, data),
+  getRedeemCodes: (params?: Record<string, unknown>) =>
+    api.get<ApiResponse<AdminRedeemCode[]>>('/admin/redeem-codes', { params }),
+  updateRedeemCodeStatus: (id: number, data: AdminUpdateRedeemCodeStatusPayload) =>
+    api.put<ApiResponse<AdminRedeemCode>>(`/admin/redeem-codes/${id}/status`, data),
+  exportRedeemCodes: (data: AdminExportRedeemCodesPayload) =>
+    api.post('/admin/redeem-codes/export', data, { responseType: 'blob' }),
   createPromotion: (data: Partial<AdminPromotion>) => api.post<ApiResponse<AdminPromotion>>('/admin/promotions', data),
   getPromotions: (params?: Record<string, unknown>) => api.get<ApiResponse<AdminPromotion[]>>('/admin/promotions', { params }),
   updatePromotion: (id: number, data: Partial<AdminPromotion>) => api.put<ApiResponse<AdminPromotion>>(`/admin/promotions/${id}`, data),
   deletePromotion: (id: number) => api.delete<ApiResponse>(`/admin/promotions/${id}`),
-  createCardSecretBatch: (data: AdminCreateCardSecretBatchPayload) => api.post<ApiResponse<AdminCardSecretBatch>>('/admin/card-secrets/batch', data),
+  createCardSecretBatch: (data: { product_id: number; sku_id?: number; name?: string; secrets: string[]; batch_no?: string; note?: string }) => api.post<ApiResponse<AdminCardSecretBatch>>('/admin/card-secrets/batch', data),
   importCardSecretCSV: (formData: FormData) =>
     api.post<ApiResponse>('/admin/card-secrets/import', formData, {
       headers: {
@@ -454,6 +463,7 @@ export const adminAPI = {
     attachment_name?: string
     message_html: string
   }) => api.post<ApiResponse<AdminTelegramBroadcast>>('/admin/telegram-bot/broadcasts', data),
+  deleteTelegramBroadcast: (id: number) => api.delete<ApiResponse>(`/admin/telegram-bot/broadcasts/${id}`),
   getTelegramBroadcastUsers: (params?: Record<string, unknown>) =>
     api.get<ApiResponse<AdminTelegramBroadcastUser[]>>('/admin/telegram-bot/users', { params }),
 }

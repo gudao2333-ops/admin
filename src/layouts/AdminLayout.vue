@@ -38,9 +38,6 @@ import {
   Bot,
   Wifi,
   Send,
-  Building2,
-  Globe,
-  HandCoins,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -222,30 +219,17 @@ const navGroups = computed<NavGroup[]>(() => {
           icon: Gift,
           permission: 'GET:/admin/gift-cards',
         },
-      ],
-    },
-    {
-      id: 'subsites',
-      label: t('admin.navGroups.subsiteManagement'),
-      icon: Building2,
-      items: [
         {
-          label: t('admin.navItems.subsiteSettings'),
-          to: '/subsites/settings',
-          icon: SlidersHorizontal,
-          permission: 'GET:/admin/subsites/settings',
+          label: t('admin.navItems.redeemCodeBatches'),
+          to: '/redeem-code-batches',
+          icon: Gift,
+          permission: 'GET:/admin/redeem-code-batches',
         },
         {
-          label: t('admin.navItems.subsiteList'),
-          to: '/subsites',
-          icon: Globe,
-          permission: 'GET:/admin/subsites',
-        },
-        {
-          label: t('admin.navItems.subsiteWithdraws'),
-          to: '/subsites/withdraws',
-          icon: HandCoins,
-          permission: 'GET:/admin/subsites/withdraws',
+          label: t('admin.navItems.redeemCodes'),
+          to: '/redeem-codes',
+          icon: Ticket,
+          permission: 'GET:/admin/redeem-codes',
         },
       ],
     },
@@ -332,6 +316,18 @@ const navGroups = computed<NavGroup[]>(() => {
           label: t('admin.navItems.telegramBotSettings'),
           to: '/telegram-bot/settings',
           icon: SlidersHorizontal,
+          permission: 'GET:/admin/settings/telegram-bot',
+        },
+        {
+          label: t('admin.navItems.telegramBotHelpCenter'),
+          to: '/telegram-bot/help-center',
+          icon: ScrollText,
+          permission: 'GET:/admin/settings/telegram-bot',
+        },
+        {
+          label: t('admin.navItems.telegramBotMenuSettings'),
+          to: '/telegram-bot/menu',
+          icon: ListOrdered,
           permission: 'GET:/admin/settings/telegram-bot',
         },
         {
